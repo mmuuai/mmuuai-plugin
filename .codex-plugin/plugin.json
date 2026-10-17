@@ -1,0 +1,24 @@
+{
+  "name": "mmuuai",
+  "version": "1.1.7",
+  "description": "授权 MMUUAI 账户，在 Agent 中调用模型、工作流与技能，按工作区会员权益与算力结算。",
+  "author": { "name": "MMUUAI" },
+  "homepage": "https://mmuu.ai",
+  "skills": "./skills/",
+  "mcpServers": {
+    "mmuuai": {
+      "type": "http",
+      "url": "https://api.mmuu.ai/mcp"
+    }
+  },
+  "interface": {
+    "displayName": "MMUUAI",
+    "shortDescription": "模型、图像、音乐与视频解析",
+    "longDescription": "读取已发布目录，调用模型、工作流与技能，并将返回结果自动保存到本机。",
+    "developerName": "MMUUAI",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "composerIcon": "./skills/mmuuai/assets/mmuuai-logo.png",
+    "logo": "./skills/mmuuai/assets/mmuuai-logo.png"
+  }
+}

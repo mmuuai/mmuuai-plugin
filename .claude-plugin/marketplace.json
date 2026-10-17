@@ -1,0 +1,11 @@
+{
+  "name": "mmuuai",
+  "owner": { "name": "MMUUAI" },
+  "plugins": [
+    {
+      "name": "mmuuai",
+      "source": "./",
+      "description": "连接 MMUUAI 账户，使用自己的工作区算力创作。"
+    }
+  ]
+}

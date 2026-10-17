@@ -1,0 +1,8 @@
+interface:
+  display_name: "MMUUAI"
+  short_description: "查询模型工作流与价格，读取创作参考和授权私人资料，生成媒体并自动保存"
+  icon_small: "./assets/mmuuai-logo.png"
+  icon_large: "./assets/mmuuai-logo.png"
+
+policy:
+  allow_implicit_invocation: true
