@@ -7,10 +7,13 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import socket
+import ssl
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import (HTTPRedirectHandler, ProxyHandler, Request,
+                            build_opener, getproxies_environment)
 
 UPLOAD_URL = "https://api.mmuu.ai/v1/uploads"
 API_BASE_URL = "https://api.mmuu.ai"
@@ -20,11 +23,12 @@ REQUEST_ID_PATTERN = re.compile(r"^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
 
 
 class UploadFailure(Exception):
-    def __init__(self, code, http_status=None, request_id=None):
+    def __init__(self, code, http_status=None, request_id=None, transport_reason=None):
         super().__init__(code)
         self.code = code
         self.http_status = http_status
         self.request_id = request_id
+        self.transport_reason = transport_reason
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -61,6 +65,21 @@ def delegated_upload_url(value, api_base_url=API_BASE_URL):
 def request_identity(headers):
     value = headers.get("X-Request-Id", "") if headers else ""
     return value if REQUEST_ID_PATTERN.fullmatch(value) else None
+
+
+def transport_reason(error):
+    reason = error.reason if isinstance(error, URLError) else error
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "tls_verification"
+    if isinstance(reason, TimeoutError):
+        return "timeout"
+    if isinstance(reason, ConnectionRefusedError):
+        return "connection_refused"
+    if isinstance(reason, socket.gaierror):
+        return "name_resolution"
+    if isinstance(reason, ConnectionResetError):
+        return "connection_reset"
+    return "network_error"
 
 
 def upload_metadata(payload, byte_size, parameter):
@@ -117,7 +136,12 @@ def upload_file(file_path, media_kind="image", mime_type=None, parameter="image"
             "Content-Type": "application/octet-stream",
             "Content-Length": str(byte_size),
         })
-        transport = opener or build_opener(NoRedirect())
+        # Match the Node/MCP transport: use explicit proxy environment only.
+        # urllib's default otherwise silently reads a separate Windows proxy.
+        proxies = getproxies_environment()
+        if "https" not in proxies and proxies.get("http"):
+            proxies["https"] = proxies["http"]
+        transport = opener or build_opener(ProxyHandler(proxies), NoRedirect())
         try:
             with transport.open(request, timeout=140) as response:
                 if response.status != 201:
@@ -132,8 +156,9 @@ def upload_file(file_path, media_kind="image", mime_type=None, parameter="image"
             identity = request_identity(error.headers)
             error.close()
             raise UploadFailure("MMUU_UPLOAD_HTTP_FAILED", error.code, identity) from None
-        except (URLError, OSError):
-            raise UploadFailure("MMUU_UPLOAD_TRANSPORT_UNKNOWN") from None
+        except (URLError, OSError) as error:
+            raise UploadFailure("MMUU_UPLOAD_TRANSPORT_UNKNOWN",
+                                transport_reason=transport_reason(error)) from None
         except (TypeError, ValueError):
             raise UploadFailure("MMUU_UPLOAD_RESPONSE_INVALID") from None
     if upload_url is not None and (not isinstance(payload, dict) or payload.get("fileName") != path.name
@@ -163,6 +188,8 @@ def main(argv=None):
             failure["httpStatus"] = error.http_status
         if error.request_id is not None:
             failure["request_id"] = error.request_id
+        if error.transport_reason is not None:
+            failure["transportReason"] = error.transport_reason
         print(json.dumps(failure), file=sys.stderr)
         return 1
     except KeyboardInterrupt:
