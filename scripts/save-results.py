@@ -213,6 +213,12 @@ def save_results(payload, *, output_dir=None, downloads=None, opener=None, timeo
                  Path(downloads or downloads_directory()) / "MMUUAI").resolve()
     context = payload.get("downloadContext", {}) if "receivedResult" in payload else {}
     context = context if isinstance(context, dict) else {}
+    skipped = payload.get("skipPartIndexes", []) if "receivedResult" in payload else []
+    if (not isinstance(skipped, list) or
+            any(type(index) is not int or index < -1 for index in skipped) or
+            len(set(skipped)) != len(skipped)):
+        raise SaveFailure("MMUU_SAVE_SKIP_INDEXES_INVALID")
+    skipped = set(skipped)
     saved, failures, batch_time = [], [], datetime.now(timezone.utc)
     try:
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -223,6 +229,8 @@ def save_results(payload, *, output_dir=None, downloads=None, opener=None, timeo
     if not isinstance(parts, list):
         raise SaveFailure("MMUU_SAVE_RESULT_INVALID")
     for index, part, ordinal, total in output_entries(result):
+        if index in skipped:
+            continue
         try:
             if not isinstance(part, dict):
                 raise SaveFailure("MMUU_SAVE_PART_INVALID")

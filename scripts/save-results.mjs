@@ -113,11 +113,20 @@ function receipt(value, exitCode) {
 
 export async function saveReceivedResult(payload, options = {}) {
   if (!record(options)) return failure("MMUU_SAVE_BRIDGE_OPTIONS_INVALID");
-  const { outputDir, pythonCommand, downloadContext } = options;
+  const { outputDir, pythonCommand, downloadContext, skipPartIndexes } =
+    options;
   let input;
   try {
     if (!record(payload)) return failure("MMUU_SAVE_BRIDGE_INPUT_INVALID");
     if (downloadContext !== undefined && !record(downloadContext)) {
+      return failure("MMUU_SAVE_BRIDGE_OPTIONS_INVALID");
+    }
+    if (
+      skipPartIndexes !== undefined &&
+      (!Array.isArray(skipPartIndexes) ||
+        !skipPartIndexes.every(partIndex) ||
+        new Set(skipPartIndexes).size !== skipPartIndexes.length)
+    ) {
       return failure("MMUU_SAVE_BRIDGE_OPTIONS_INVALID");
     }
     const naming = {};
@@ -132,9 +141,13 @@ export async function saveReceivedResult(payload, options = {}) {
       }
     }
     input = JSON.stringify(
-      downloadContext === undefined
+      downloadContext === undefined && skipPartIndexes === undefined
         ? payload
-        : { receivedResult: payload, downloadContext: naming },
+        : {
+            receivedResult: payload,
+            downloadContext: naming,
+            ...(skipPartIndexes === undefined ? {} : { skipPartIndexes }),
+          },
     );
     if (typeof input !== "string")
       return failure("MMUU_SAVE_BRIDGE_INPUT_INVALID");
