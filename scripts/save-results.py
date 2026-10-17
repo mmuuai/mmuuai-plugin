@@ -8,8 +8,9 @@ import json
 import os
 from pathlib import Path
 import re
+import ssl
 import sys
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import unquote_to_bytes, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import uuid
@@ -247,7 +248,9 @@ def save_results(payload, *, output_dir=None, downloads=None, opener=None, timeo
             if isinstance(error, HTTPError):
                 error.close()
             code = error.code if isinstance(error, SaveFailure) else (
-                "MMUU_SAVE_HTTP_FAILED" if isinstance(error, HTTPError) else "MMUU_SAVE_FAILED")
+                "MMUU_SAVE_HTTP_FAILED" if isinstance(error, HTTPError) else
+                "MMUU_SAVE_TLS_FAILED" if isinstance(error, URLError) and isinstance(error.reason, ssl.SSLError) else
+                "MMUU_SAVE_TRANSPORT_FAILED" if isinstance(error, URLError) else "MMUU_SAVE_FAILED")
             failure = {"partIndex": index, "code": code}
             status = error.code if isinstance(error, HTTPError) else getattr(error, "http_status", None)
             if isinstance(status, int) and 100 <= status <= 599:

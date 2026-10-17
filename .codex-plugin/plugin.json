@@ -1,6 +1,6 @@
 {
   "name": "mmuuai",
-  "version": "1.1.14",
+  "version": "1.1.19",
   "description": "授权 MMUUAI 账户，在 Agent 中调用模型、工作流与技能，按工作区会员权益与算力结算。",
   "author": { "name": "MMUUAI" },
   "homepage": "https://mmuu.ai",

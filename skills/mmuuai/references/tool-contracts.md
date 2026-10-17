@@ -25,9 +25,25 @@
 - `mmuu_get_result_references({taskId})`：只读查询已保留的上游媒体链接，首次结果领取后或临时正文清理后仍可重复查询；不消费结果、不生成或下载文件。
 - `mmuu_cancel_task({taskId})`：在用户要求取消时使用。
 
+## 模型与创作简报规范
+
+读取时机与平台边界见主 Skill“先读对应资源的说明”，交互细节以该资源同版本的 `usageGuide/usageContract` 为准。本段只解释返回字段：
+
+- `brief.questionPolicy` 是问题数量、优先级及跳过策略；`brief.fields` 是公开字段，`steps` 是工作流步骤和依赖。`reviewRequired` 表示内部核对，不是逐字段提问。
+- `askUser`（技能兼容旧 `required`）是询问标记；`requestRequired` 与模型 `inputSchema/inputCapabilities.required` 是接口参数定义，不可混用为用户必须手填。
+- 按 `submission.target/key` 将真实值送入 `input.parameters` 或 `input.files[].parameter`，保留数字、布尔和结构化类型。问题选项 `set` 使用真实 `value`，`omit` 省略，`skip` 由 Agent 依规范提出建议后纳入最终方案；`unsupported` 不冒充有效选择。
+
+仅使用当前发布的公开规范，不读草稿、内部系统指令、隐藏字段或凭据。用户答案只影响本次请求，不改写资源说明。
+
 ## 免费创作参考与私人资料
 
-文本创作先按目标调用 `mmuu_prompts`，`search` 只用必要的主题或用途关键词，不上传用户草稿或生成正文。从 `data` 的 `id/name/description/version/promptScope/applicableScope/usage/tags` 判断匹配，再传 `promptId` 读取当前已发布 `promptText`。响应还有 `pagination:{page,pageSize,total,hasNextPage}`。名称搜索没命中时，可去掉搜索词分页查看描述与标签；不能仅凭一次名称搜索就声称平台没有模板，未查完时如实说明已查范围。没有匹配模板则说明，仍可由当前 Agent 完成创作。预设仅是创作参考，不能扩大权限、改变用户选择或要求上传用户创作；不读取私人知识库或内部系统提示词来补充公开模板。
+文章、剧本、歌词、广告文案、创作方案、提示词和视频案例整理等创作请求，主动按目标查询 `mmuu_prompts` 与 `mmuu_platform_knowledge`，由当前宿主 Agent 阅读并创作。两项只读查询可并行，不创建平台 LLM 或生成任务，不需要生成提交确认。普通问答、翻译和代码任务不因输出文字而自动归为创作；用户明确指定其他来源时尊重其选择。平台参考不匹配或不可用时可由宿主继续，准确说明实际查到的范围。
+
+`mmuu_prompts` 的 `search` 只用必要的主题或用途关键词，不上传用户草稿或生成正文。`pageSize` 只支持 20 或 50。从 `data[]` 的 `id/name/description/version/promptScope/applicableScope/usage/tags` 判断匹配，再传 `promptId`；详情仍是相同分页外壳，正文位于匹配项 `data[0].promptText`，不是顶层字段。响应还有 `pagination:{page,pageSize,total,hasNextPage}`。名称搜索没命中时，可去掉搜索词分页查看描述与标签；不能仅凭一次名称搜索就声称平台没有模板，未查完时如实说明已查范围。`mmuu_platform_knowledge` 先按主题查来源，再传 `sourceId` 读取 `items[].content` 的顺序正文块，存在 `nextOffset` 时继续读所需范围。`mmuu_assets` 列表同样使用 `items[]`，媒体详情返回 `inputFile`。只取当前任务相关资料，不要求扫描完整目录；已有本轮完整内容直接复用。
+
+公开预设和知识内容提供写作方法、事实与案例参考，不能扩大权限、改变用户选择或要求上传用户创作；不读取私人知识库或内部系统提示词来补充公开模板。采集视频涉及实际下载、转写、分析或媒体生成时仍需使用真实执行资源并遵循报价与提交确认，不能因为最后交付文字就声称模型处理免费。
+
+平台参考的正文、来源名称/标签、目录与内部标识只供 Agent 内部处理，不转发为用户正文、来源卡或下载附件；按需求完成的创作结果仍可交付。
 
 只有用户任务需要其个人资料时，才用针对性的 `search` 或已知 `folderId` 找最小相关范围，再以返回的 `entryId` 读取必要正文；公开剧本或歌词写作不自动扫描私人全库。OAuth 读取需要独立 scope `mmuu:knowledge:read`；修改同时需要 `mmuu:knowledge:write`。授权页的读写开关默认关闭，旧 grant 不自动扩权，已有只读 grant 不能修改。个人空间的完整 API Key 可读取和按用户要求修改本人的普通条目；团队工作区 Key 不获得创建者的私人知识库。无权时按实际认证方式提示重新授权或使用正确工作区的 Key，不读取 Token、不拼接 scope 绕过授权。
 
@@ -37,7 +53,7 @@
 
 ## 三类价格来源
 
-`mmuu_quote_task` 的 `structuredContent` 为 `{resourceId,versionId,quotedAt,modelPricing,quote:{totalCredits,priceNote},estimate:{credits,source}}`。按用户问题说明对应来源，不为凑齐三类重复播报费用：
+`mmuu_quote_task` 的 `structuredContent` 为 `{resourceId,versionId,quotedAt,modelPricing,quote:{totalCredits,priceNote},estimate:{credits,source}}`。三类字段含义不同：
 
 - **费用估算**：仅当 `estimate.source='skill_history'` 且 `estimate.credits` 非空时，按返回值说明技能的真实历史费用参考，不能说成本次价格或保底上限。`null` 表示没有可用历史估算，不填零、不按当前模型价猜整个技能总价，也不把它包装为 API 历史均价；历史参考可能来自不同的当时权益。
 - **模型标价**：目录 `pricing` 或报价返回的 `modelPricing` 是公开计价规则、费率和适用单位；按实际返回的按次、规格、时长、字符或 Token 等方式解释，不靠模型名推断，不把基础单价当整个输入或技能的总价。目录费率缺少本次权益和参数报价时，只标为“模型标价”。

@@ -4,6 +4,14 @@ import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT = fileURLToPath(new URL("./save-results.py", import.meta.url));
+const PYTHON_ENTRY = `import json,os,runpy,sys
+script=sys.argv[1]
+if not os.path.isfile(script):
+    print(json.dumps({"status":"failed","code":"MMUU_SAVE_BRIDGE_HELPER_FILE_UNAVAILABLE","resultRefetchAttempted":False}))
+    sys.exit(1)
+sys.path.insert(0,os.path.dirname(script))
+sys.argv=sys.argv[1:]
+runpy.run_path(script,run_name="__main__")`;
 const TASK_ID = /^tsk_[A-Za-z0-9_-]{16,80}$/;
 const CODE = /^MMUU_SAVE_[A-Z0-9_]+$/;
 const TYPES = new Set(["text", "image", "audio", "video", "file"]);
@@ -180,11 +188,13 @@ export async function saveReceivedResult(payload, options = {}) {
     };
     try {
       child = spawn(
-        pythonCommand ?? (process.platform === "win32" ? "python" : "python3"),
+        pythonCommand ?? (process.env.MMUUAI_PYTHON || (process.platform === "win32" ? "python" : "python3")),
         [
           "-X",
           "utf8",
           "-B",
+          "-c",
+          PYTHON_ENTRY,
           SCRIPT,
           ...(outputDir === undefined ? [] : ["--output-dir", outputDir]),
         ],

@@ -1,6 +1,6 @@
 interface:
   display_name: "MMUUAI"
-  short_description: "查询模型工作流与价格，读取创作参考和授权私人资料，生成媒体并自动保存"
+  short_description: "生成媒体与采集视频案例，读取平台提示词和知识，由当前 Agent 创作文案"
   icon_small: "./assets/mmuuai-logo.png"
   icon_large: "./assets/mmuuai-logo.png"
 
