@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import re
 import ssl
+import subprocess
+from shutil import which
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote_to_bytes, urlsplit
@@ -163,7 +165,15 @@ def save_media(part, directory, name_for_mime, *, opener=None, timeout=120):
             return write_stream(directory, name_for_mime, mime, source)
     request = Request(remote_url(url), method="GET", headers={"User-Agent": "MMUU-AI-result-saver"})
     transport = opener or build_opener(ResultRedirect())
-    with transport.open(request, timeout=timeout) as response:
+    try:
+        response = transport.open(request, timeout=timeout)
+    except URLError as error:
+        # A host's native certificate store may work when Python's TLS does not.
+        # GET is safe to repeat; this never resubmits or claims a generated task.
+        if opener is None and isinstance(error.reason, ssl.SSLError) and which("curl.exe" if sys.platform == "win32" else "curl"):
+            return save_with_native_curl(part, directory, name_for_mime, timeout)
+        raise
+    with response:
         if response.status != 200:
             raise SaveFailure("MMUU_SAVE_HTTP_FAILED", response.status)
         supplied = mime_type(part.get("mimeType"))
@@ -173,6 +183,41 @@ def save_media(part, directory, name_for_mime, *, opener=None, timeout=120):
         length = response.headers.get("Content-Length", "")
         expected = int(length) if re.fullmatch(r"[0-9]+", length) else None
         return write_stream(directory, name_for_mime, mime, response, expected)
+
+
+def save_with_native_curl(part, directory, name_for_mime, timeout):
+    program = which("curl.exe" if sys.platform == "win32" else "curl")
+    args = [program, "--disable", "--silent", "--fail", "--location",
+            "--disallow-username-in-url", "--max-redirs", "10",
+            "--proto", "=http,https", "--proto-redir", "=http,https",
+            "--max-time", str(timeout), "--user-agent", "MMUU-AI-result-saver",
+            "--write-out", "%{stderr}%{http_code}", "--config", "-"]
+    # Signed URLs stay on stdin, not in shell source, process arguments or logs.
+    config = 'url = ' + json.dumps(remote_url(part["url"]), ensure_ascii=False) + '\n'
+    child = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}))
+    saved = None
+    try:
+        child.stdin.write(config.encode("utf-8"))
+        child.stdin.close()
+        mime = mime_type(part.get("mimeType")) or "application/octet-stream"
+        saved = write_stream(directory, name_for_mime, mime, child.stdout)
+        status = child.stderr.read(16)
+        if child.wait(timeout=5) != 0 or status.strip() != b"200":
+            raise SaveFailure("MMUU_SAVE_TRANSPORT_FAILED")
+        return saved
+    except Exception:
+        if saved is not None:
+            Path(saved["path"]).unlink(missing_ok=True)
+        raise
+    finally:
+        if not child.stdin.closed:
+            child.stdin.close()
+        if child.poll() is None:
+            child.kill()
+        child.wait()
+        child.stdout.close()
+        child.stderr.close()
 
 
 def result_body(payload):

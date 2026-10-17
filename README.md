@@ -2,7 +2,7 @@
 
 在 Codex、Claude Code 等 Agent 中调用 MMUUAI 已发布的模型、工作流和技能。默认通过浏览器登录 MMUUAI，选择工作区并确认授权，按当前工作区会员权益和实际用量结算。远程 MCP 服务为 `https://api.mmuu.ai/mcp`，传输方式为 Streamable HTTP。
 
-插件 1.1.19 包含使用 Skill、一个远程 MCP 连接、Python 标准库上传和结果保存脚本，以及可选的 Node.js 结果保存桥接模块；不需要 MMUUAI 源码、第三方 Node/Python 依赖或本站本地服务。账户密码、Cookie 和宿主保存的 OAuth Token 不交给 Agent，也不写入本插件。
+插件 1.1.20 包含使用 Skill、一个远程 MCP 连接、Python 标准库上传和结果保存脚本，以及可选的 Node.js 结果保存桥接模块；不需要 MMUUAI 源码、第三方 Node/Python 依赖或本站本地服务。账户密码、Cookie 和宿主保存的 OAuth Token 不交给 Agent，也不写入本插件。
 
 技能工作流按实际模型任务分别生成账单：前面已成功的步骤正常结算并保留结果，后续失败不退还前面费用；未成功的任务释放预留额度。
 

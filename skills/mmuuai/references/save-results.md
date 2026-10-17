@@ -50,7 +50,7 @@ for (const block of saved.content ?? []) {
 
 Node 桥接和 CLI 支持进程环境 `MMUUAI_PYTHON`，显式 `pythonCommand` 优先。若默认 Python 看不到安装目录，返回 `MMUU_SAVE_BRIDGE_HELPER_FILE_UNAVAILABLE`；使用宿主依赖工具提供的 Python 绝对路径，只重试原对象的本机保存，不重新领取结果或创建任务。
 
-若保存器返回 `MMUU_SAVE_TLS_FAILED` 或 `MMUU_SAVE_TRANSPORT_FAILED`，保留原对象和已保存部分，检查当前宿主的网络与下载能力。可用宿主文件工具下载原对象中尚未保存的相同链接并核对文件；不关闭证书校验，不因本机传输失败重新生成。恢复后复用真实本机文件，避免重复保存已完成的部分。
+默认 Python 发生 TLS 错误时，保存器会在宿主已有 `curl` 的情况下，使用其原生证书校验对同一结果链接回退下载一次，不另行安装程序。若仍返回 `MMUU_SAVE_TLS_FAILED` 或 `MMUU_SAVE_TRANSPORT_FAILED`，保留原对象和已保存部分，检查当前宿主的网络与下载能力。可用宿主文件工具下载原对象中尚未保存的相同链接并核对文件；不关闭证书校验，不因本机传输失败重新生成。恢复后复用真实本机文件，避免重复保存已完成的部分。
 
 如果原对象已经不可用，查询 `mmuu_get_result_references({taskId})`。将返回的完整引用对象直接交给同一保存器补存，只完成已授权的首次交付，不创建新任务。没有上游链接的内联图片无法凭空补全；如实报告已核验的缺失，不重复领取、不自动重新生成。
 
