@@ -4,19 +4,23 @@
 
 ## 工具参数
 
+工作流中的每个模型调用都是独立任务、独立账单：已成功生成的步骤按实际用量与会员权益结算，后续步骤失败或停止不退还前面费用，成功结果仍保留 24 小时。失败、未执行的任务不收取生成费用，只释放其尚未结算的预留额度；释放预留不能说成整条工作流退款。
+
 发现并使用服务实际公布的以下工具，不猜测前缀：
 
 - `mmuu_catalog({kind?, resourceId?, search?, cursor?, limit?})`：`kind` 为 `model/workflow/skill`，默认 `model`；传 `resourceId` 查询详情，未传时列目录，`limit` 为 1..100。
 - `mmuu_prompts({search?,page?,pageSize?,promptId?})`：免费只读公开已发布预设提示词；列表不含正文，按 `promptId` 读取当前发布全文。
-- `mmuu_assets({scope?,assetId?,kind?,source?,search?,page?,pageSize?})`：`scope=public` 查询公开社区资产，默认查询当前授权工作区本人的资产；个人资产 `assetId` 返回可放进 `input.files` 的 `inputFile`。仍使用站内当前归属与工作区权限，不读取其他用户的文件。
-- `mmuu_platform_knowledge({collectionId?,sourceId?,search?,offset?,limit?})`：免费查询当前已发布的平台知识与视频案例；传 `sourceId` 读取按顺序排列的正文块，有 `nextOffset` 时继续，不把摘要当全文。
+- `mmuu_assets({scope?,assetId?,kind?,source?,search?,page?,pageSize?})`：`scope=public` 查询公开社区资产，默认查询当前授权工作区本人的资产；媒体 `assetId` 返回可放进 `input.files` 的 `inputFile`，提示词资产详情返回完整 `promptText`。仍使用站内当前归属与工作区权限，不读取其他用户的文件。
+- `mmuu_platform_knowledge({collectionId?,sourceId?,search?,offset?,limit?})`：免费查询当前已发布的平台知识与视频案例；传 `sourceId` 读取完整来源中按顺序排列的正文块，不再按发现阶段的搜索词过滤正文。有 `nextOffset` 时继续，不把摘要当全文；分页的 `revisionId` 变化时重新读取同一来源，避免混用不同发布版本。
 - `mmuu_search_knowledge({search?,folderId?,page?,pageSize?})`：按独立私人知识库授权检索账号本人的普通目录与 Markdown 条目。
 - `mmuu_read_knowledge({entryId})`：按独立只读权限读取本人普通 Markdown 正文，返回并发版本 `version` 与正文版本记录 `contentVersion`。
 - `mmuu_update_knowledge({entryId,expectedVersion,title?,contentMarkdown?})`：具备独立读写双权限后，按用户明确修改意图更新本人现有普通 Markdown 的标题和/或正文；`expectedVersion` 使用刚读取的 `version`。
 - `mmuu_prepare_upload({fileName,mimeType,mediaKind,byteSize})`：为用户选定的一个本机文件准备短期一次性上传地址，mediaKind 为 image/video/audio/file；不创建生成任务。
-- `mmuu_quote_task({resourceId,versionId?,input})`：工具可用时，只读查询拟创建任务的模型标价、本次报价和可得的技能历史参考；输入与创建任务相同，但不带 `idempotencyKey`，不创建任务、不扣生成算力，也不消耗或预占每日免费次数。
-- `mmuu_create_task({resourceId, versionId?, input, idempotencyKey})`：创建一次任务，`idempotencyKey` 必填。
-- `mmuu_get_task({taskId})`：查询既有任务。
+- `mmuu_quote_task({resourceId,versionId?,input,workflowMode?})`：工具可用时，只读查询拟创建任务的模型标价、本次报价和可得的技能历史参考；输入与创建任务相同，但不带 `idempotencyKey`，不创建任务、不扣生成算力，也不消耗或预占每日免费次数。
+- `mmuu_create_task({resourceId, versionId?, input, workflowMode?, idempotencyKey})`：创建一次任务，`idempotencyKey` 必填。
+- `mmuu_get_task({taskId})`：查询既有任务，逐步暂停返回 `awaiting_confirmation`。
+- `mmuu_get_step_confirmation({taskId})`：读取下一步全部实际 `items`、配置中文字段和 `ordinal/confirmationToken`，不消费前步结果。
+- `mmuu_confirm_step({taskId,ordinal,confirmationToken})`：用户批准已展示的本步清单后，续接原任务；重复相同确认不批准后续步骤。
 - `mmuu_get_result({taskId})`：首次领取结果。
 - `mmuu_get_result_references({taskId})`：只读查询已保留的上游媒体链接，首次结果领取后或临时正文清理后仍可重复查询；不消费结果、不生成或下载文件。
 - `mmuu_cancel_task({taskId})`：在用户要求取消时使用。
@@ -43,7 +47,7 @@
 
 **余额为 0 不代表本次不能执行**，可能仍有共享的免费次数。不要在宿主根据余额、目录标价或自行计算的最低预留额提前拒绝；用本次完整输入查询后台报价，需求已明确授权时正常提交，由后台裁决可用权益。免费次数耗尽后，仍由后台按实际价格、会员折扣和余额裁决；询价不锁定权益，不因报价或次数变化重建已受理任务。
 
-公开服务未提供报价工具或尚未取得有效报价时，不声称已获得本次报价；可用的目录费率仍只作模型标价。报价和历史估算都不等于实际扣费，实际以该任务真实账单为准；仅有 `billingStatus` 不能推算实扣数字。用户要求或已有授权下可按可得信息继续执行，不因此额外确认、创建测试任务、换模型或重复提交。正常成功后的媒体展示与默认保存规则不变。
+公开服务未提供报价工具或尚未取得有效报价时，不声称已获得本次报价；可用的目录费率仍只作模型标价。报价和历史估算都不等于实际扣费，实际以该任务真实账单为准；仅有 `billingStatus` 不能推算实扣数字。仍需按主 Skill 取得最终请求的提交确认，不把费用未知当作零费用；不为此创建测试任务、换模型或重复提交。正常成功后的媒体展示与默认保存规则不变。
 
 ## 本地文件与远程 URL
 
@@ -61,4 +65,4 @@ python <插件根目录>/scripts/upload-file.py reference.png --upload-url "<刚
 
 已有公开 HTTPS 文件可按详情构造 `files` 项：`source` 为 `{type: "url", url: 实际地址}`，另提供真实 `mediaKind/fileName/mimeType/parameter`。上传返回的 `ref` 应及时使用，不能跨 Key、Project 或 Workspace 复用。不要把同一输入在 `parameters` 与 `files` 重复添加。
 
-文本、内联媒体和上传引用最长临时保留 30 分钟，以响应时间为准，因此首次领取后及时默认保存。HTTP(S) 上游媒体 URL 在本站 API 调用记录中保留引用，可重复查看；这不等于本站代存文件，上游链接可能过期、拒绝访问或暂时不可读。不能仅凭 403、CORS 或网络错误断言确切过期。平台不自动归档到 OSS，仍保留计费与任务/交付元数据；本插件默认保存到用户本机，与服务端存储规则不同。不要因历史引用可重复看而重复调用一次性 get_result。
+文本、内联媒体和上传引用最长临时保留 30 分钟，以响应时间为准，因此首次领取后及时默认保存。HTTP(S) 上游媒体 URL 在本站 API 调用记录中保留引用，可重复查看；这不等于本站代存文件，上游链接可能过期、拒绝访问或暂时不可读。不能仅凭 403、CORS 或网络错误断言确切过期。模型生成的媒体、输出文件及纯文字（UTF-8 TXT）会自动保存到当前工作区本人的生成资产（OSS），从各文件完成时起保留 24 小时，查看/下载不续期，到期清除原文件及派生文件；任务账单继续保留。解析/下载的原始素材仍按既有不转存规则处理。本机已保存文件不随云端过期删除。不要因历史引用可重复看而重复调用一次性 get_result。
